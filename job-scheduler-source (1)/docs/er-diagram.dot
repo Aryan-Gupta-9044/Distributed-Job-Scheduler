@@ -1,0 +1,150 @@
+digraph ER {
+  rankdir=LR;
+  graph [fontname="Helvetica", bgcolor="white", pad=0.4, nodesep=0.4, ranksep=0.7];
+  node [fontname="Helvetica", shape=plaintext];
+  edge [fontname="Helvetica", fontsize=9, color="#5C6C7C", fontcolor="#33404D", arrowsize=0.7];
+
+  users [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#E9F1FF"><B>users</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">email (unique)</TD></TR>
+      <TR><TD ALIGN="LEFT">password_hash</TD></TR>
+      <TR><TD ALIGN="LEFT">name</TD></TR>
+    </TABLE>>];
+
+  organizations [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#E9F1FF"><B>organizations</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">name, slug</TD></TR>
+      <TR><TD ALIGN="LEFT">FK owner_id -&gt; users</TD></TR>
+    </TABLE>>];
+
+  org_members [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#FFF3DC"><B>org_members</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK org_id, user_id</TD></TR>
+      <TR><TD ALIGN="LEFT">role (owner/admin/member/viewer)</TD></TR>
+    </TABLE>>];
+
+  projects [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#E9F1FF"><B>projects</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">FK org_id -&gt; organizations</TD></TR>
+      <TR><TD ALIGN="LEFT">name, description</TD></TR>
+    </TABLE>>];
+
+  queues [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#E9F1FF"><B>queues</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">FK project_id -&gt; projects</TD></TR>
+      <TR><TD ALIGN="LEFT">priority, concurrency_limit</TD></TR>
+      <TR><TD ALIGN="LEFT">rate_limit_per_sec, shard_key</TD></TR>
+      <TR><TD ALIGN="LEFT">FK default_retry_policy_id</TD></TR>
+      <TR><TD ALIGN="LEFT">is_paused</TD></TR>
+    </TABLE>>];
+
+  retry_policies [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#F0E9FF"><B>retry_policies</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">strategy (fixed/linear/exp)</TD></TR>
+      <TR><TD ALIGN="LEFT">max_attempts, base/max_delay_ms</TD></TR>
+      <TR><TD ALIGN="LEFT">jitter</TD></TR>
+    </TABLE>>];
+
+  jobs [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#FFE9E9"><B>jobs</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">FK queue_id -&gt; queues</TD></TR>
+      <TR><TD ALIGN="LEFT">type, status, priority</TD></TR>
+      <TR><TD ALIGN="LEFT">payload (jsonb), handler</TD></TR>
+      <TR><TD ALIGN="LEFT">run_at, cron_expression</TD></TR>
+      <TR><TD ALIGN="LEFT">FK retry_policy_id, attempt</TD></TR>
+      <TR><TD ALIGN="LEFT">depends_on (uuid[])</TD></TR>
+      <TR><TD ALIGN="LEFT">FK claimed_by -&gt; workers</TD></TR>
+      <TR><TD ALIGN="LEFT">lock_token, batch_id</TD></TR>
+      <TR><TD ALIGN="LEFT">FK scheduled_job_id</TD></TR>
+    </TABLE>>];
+
+  job_executions [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#FFE9E9"><B>job_executions</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">FK job_id -&gt; jobs</TD></TR>
+      <TR><TD ALIGN="LEFT">FK worker_id -&gt; workers</TD></TR>
+      <TR><TD ALIGN="LEFT">attempt_number</TD></TR>
+      <TR><TD ALIGN="LEFT">started_at, finished_at, duration_ms</TD></TR>
+      <TR><TD ALIGN="LEFT">result, error_message</TD></TR>
+    </TABLE>>];
+
+  job_logs [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#F4F6F8"><B>job_logs</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">FK job_id, FK execution_id</TD></TR>
+      <TR><TD ALIGN="LEFT">level, message, created_at</TD></TR>
+    </TABLE>>];
+
+  scheduled_jobs [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#FFF3DC"><B>scheduled_jobs</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">FK queue_id -&gt; queues</TD></TR>
+      <TR><TD ALIGN="LEFT">cron_expression, handler, payload</TD></TR>
+      <TR><TD ALIGN="LEFT">next_run_at, last_run_at, is_active</TD></TR>
+    </TABLE>>];
+
+  dead_letter_queue [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#8C2F39" COLOR="white"><FONT COLOR="white"><B>dead_letter_queue</B></FONT></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">FK job_id -&gt; jobs</TD></TR>
+      <TR><TD ALIGN="LEFT">FK queue_id -&gt; queues</TD></TR>
+      <TR><TD ALIGN="LEFT">final_error, total_attempts</TD></TR>
+      <TR><TD ALIGN="LEFT">ai_failure_summary</TD></TR>
+      <TR><TD ALIGN="LEFT">resolved, resolved_at</TD></TR>
+    </TABLE>>];
+
+  workers [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#E8F8F0"><B>workers</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">hostname, pid, shard_key</TD></TR>
+      <TR><TD ALIGN="LEFT">max_concurrency, status</TD></TR>
+      <TR><TD ALIGN="LEFT">started_at, last_seen_at</TD></TR>
+    </TABLE>>];
+
+  worker_heartbeats [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" COLOR="#5B6472" BGCOLOR="#F4F6F8">
+      <TR><TD BGCOLOR="#E8F8F0"><B>worker_heartbeats</B></TD></TR>
+      <TR><TD ALIGN="LEFT">PK id</TD></TR>
+      <TR><TD ALIGN="LEFT">FK worker_id -&gt; workers</TD></TR>
+      <TR><TD ALIGN="LEFT">active_job_count, cpu_load</TD></TR>
+      <TR><TD ALIGN="LEFT">created_at</TD></TR>
+    </TABLE>>];
+
+  users -> organizations [label="1 owns N", dir=back, arrowtail=crow];
+  users -> org_members [label="1..N"];
+  organizations -> org_members [label="1..N"];
+  organizations -> projects [label="1..N"];
+  projects -> queues [label="1..N"];
+  retry_policies -> queues [label="0..1 default", style=dashed];
+  retry_policies -> jobs [label="0..1 override", style=dashed];
+  queues -> jobs [label="1..N"];
+  queues -> scheduled_jobs [label="1..N"];
+  scheduled_jobs -> jobs [label="1..N materializes", style=dashed];
+  jobs -> job_executions [label="1..N attempts"];
+  jobs -> job_logs [label="1..N"];
+  job_executions -> job_logs [label="0..N", style=dashed];
+  jobs -> dead_letter_queue [label="0..1"];
+  queues -> dead_letter_queue [label="1..N"];
+  workers -> jobs [label="0..N claims", style=dashed];
+  workers -> job_executions [label="1..N"];
+  workers -> worker_heartbeats [label="1..N"];
+  jobs -> jobs [label="depends_on\n(uuid[] self-ref)", style=dotted, constraint=false];
+}

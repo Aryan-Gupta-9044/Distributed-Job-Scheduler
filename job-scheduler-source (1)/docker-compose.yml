@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: job_scheduler
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  api:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    command: sh -c "npm run migrate && npm run build && node dist/server.js"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/job_scheduler
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-change-me
+    ports: ["4000:4000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+
+  scheduler:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    command: sh -c "npm run build && node dist/scripts/runSchedulerLeader.js"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/job_scheduler
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      api: { condition: service_started }
+
+  worker-1:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    command: sh -c "npm run build && node dist/scripts/runWorker.js"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/job_scheduler
+      REDIS_URL: redis://redis:6379
+      WORKER_QUEUE_ID: ${WORKER_QUEUE_ID:-}
+    depends_on:
+      api: { condition: service_started }
+
+  frontend:
+    build: ./frontend
+    ports: ["5173:5173"]
+    environment:
+      VITE_API_URL: http://localhost:4000
+    depends_on:
+      api: { condition: service_started }
+
+volumes:
+  pgdata:

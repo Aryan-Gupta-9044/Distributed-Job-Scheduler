@@ -1,0 +1,56 @@
+digraph Architecture {
+  rankdir=LR;
+  graph [fontname="Helvetica", bgcolor="white", pad=0.4, nodesep=0.55, ranksep=0.9, splines=ortho];
+  node [fontname="Helvetica", shape=box, style="rounded,filled", fillcolor="#F4F6F8", color="#5B6472", penwidth=1.2, fontsize=12, margin="0.22,0.14"];
+  edge [fontname="Helvetica", fontsize=10, color="#5C6C7C", fontcolor="#33404D"];
+
+  subgraph cluster_clients {
+    label="Clients"; fontsize=13; color="#B9C2CC"; style=rounded;
+    Dashboard [label="React Dashboard\n(Queues / Jobs / Workers / DLQ)", fillcolor="#E9F1FF"];
+    APIClient [label="External API Clients\n(services enqueueing jobs)", fillcolor="#E9F1FF"];
+  }
+
+  subgraph cluster_api_tier {
+    label="Stateless API Tier (horizontally scaled)"; fontsize=13; color="#B9C2CC"; style=rounded;
+    API1 [label="API Node 1\nExpress + REST\n+ Socket.io"];
+    API2 [label="API Node 2\nExpress + REST\n+ Socket.io"];
+  }
+
+  subgraph cluster_control {
+    label="Control Plane"; fontsize=13; color="#B9C2CC"; style=rounded;
+    Scheduler [label="Scheduler Leader\n(cron materialization,\nstale-worker sweep)", fillcolor="#FFF3DC"];
+  }
+
+  subgraph cluster_workers {
+    label="Worker Pool (horizontally scaled, sharded)"; fontsize=13; color="#B9C2CC"; style=rounded;
+    W1 [label="Worker 1\nshard: default", fillcolor="#E8F8F0"];
+    W2 [label="Worker 2\nshard: default", fillcolor="#E8F8F0"];
+    W3 [label="Worker 3\nshard: reports", fillcolor="#E8F8F0"];
+  }
+
+  subgraph cluster_data {
+    label="Data Plane"; fontsize=13; color="#B9C2CC"; style=rounded;
+    PG [label="PostgreSQL\n(source of truth:\njobs, queues, executions,\nDLQ, RBAC)", shape=cylinder, fillcolor="#F0E9FF"];
+    Redis [label="Redis\n(distributed locks,\nrate-limit token buckets,\nleader election)", shape=cylinder, fillcolor="#FFE9E9"];
+  }
+
+  Dashboard -> API1 [label="HTTPS + WebSocket"];
+  APIClient -> API2 [label="HTTPS (REST)"];
+
+  API1 -> PG [label="RBAC-checked CRUD"];
+  API2 -> PG;
+  API1 -> Redis [label="rate-limit check"];
+
+  Scheduler -> Redis [label="acquire\nleader lock"];
+  Scheduler -> PG [label="materialize cron jobs,\nreclaim orphaned jobs"];
+
+  W1 -> PG [label="SELECT..FOR UPDATE\nSKIP LOCKED (claim)"];
+  W2 -> PG;
+  W3 -> PG;
+  W1 -> Redis [label="rate-limit tokens"];
+  W1 -> API1 [label="report result /\nheartbeat", style=dashed];
+  W2 -> API2 [style=dashed];
+
+  PG -> API1 [label="job status change", style=dashed, color="#8C2F39", fontcolor="#8C2F39"];
+  API1 -> Dashboard [label="live update\n(Socket.io)", style=dashed, color="#39C08E", fontcolor="#248F68"];
+}
